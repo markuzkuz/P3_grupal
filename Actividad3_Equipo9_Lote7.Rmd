@@ -1,0 +1,228 @@
+---
+title: "Actividad 3: Análisis de un caso práctico en R"
+author: "Grupo 9 Lote 7 - Máster Bioinformática UNIR - Estadística y R"
+date: "2025-01-26 - Curso 2024-2025"
+output: 
+  html_document:
+    theme: default
+    css: custom1.css
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+# Cargar librerías
+library(tidyverse)
+library(gtsummary)
+library(nortest)
+library(car)
+library(flextable)
+library(factoextra)
+
+```
+
+<br>
+<br>
+
+## Objetivos de la actividad
+El objetivo principal de la actividad es aplicar los conceptos aprendidos durante toda la materia (visualización gráfica, análisis descriptivos, contrastes de hipótesis, modelos inferenciales, PCA…. Para ello, se va a utilizar un dataset que contiene información de la expresión de 46 genes en 65 pacientes, cada uno con distintos tipos de tratamiento y características tumorales. En primer lugar, se pretende comprobar la normalidad de la distribución de la expresión de los genes para asegurar los supuestos estadísticos necesarios. A continuación, se realizará un PCA, gráficos descriptivos, tablas descriptivas y distintos modelos predictivos de regresión logística usando las librerías y comandos vistas en la asignatura como son: base, stats, factoextra, pheatmap, gtsummary.
+
+<br>
+<br>
+Para la realización de la actividad, se cargará el dataset de interés «Dataset expresión genes.csv», el cual se trata de una base de datos de 65 pacientes que contiene información de la expresión de 46 genes con diferentes funciones. Además de estas variables, contiene otras variables de interés como el tratamiento (A o B) que siguen cada paciente, tipo de tumor que tienen (colorrectal, pulmón y mama) y la extensión tumoral (localizado, metastásico o regional). Por último, se recoge información de variables bioquímicas, síntomas y otras variables sociodemográficas.
+
+## Resolución de ejercicios
+### Ejercicio 1
+El primer ejercicio consiste en abrir, explorar y preprocesar la base de datos utilizando las funciones vistas para cargar, explorar y analizar la base de datos en formato CSV.
+
+
+```{r}
+# Cargar el csv de expresión génica
+datos <- read.csv("./data/expresion genes.csv")
+
+# Con el dataset cargado, observaremos los datos y su estructura:
+#head(datos)
+#str(datos)
+#summary(datos)
+
+# Y verificaremos si hay algun valor missing (NA)
+
+#is.na(datos)
+#colSums(is.na((datos)))
+#rowSums(is.na(datos))
+
+# Al no haber ningún valor faltante, se puede seguir con el desarollo de la actividad.
+
+```
+
+### Ejercicio 2 y 3: Aplicar un PCA con gráficos descriptivos
+
+Se utilizará la librería correspondiente para realizar un PCA de los datos de expresión génica (dónde se cogeran al menos aquellos componentes que expliquen un 70% de la varianza de los datos).
+
+Para ello, se ilustrarán cada uno de los pasos que se vieron en el temario y en clase, creando tablas o figuras de cada uno de ellos:
+
+```{r}
+#Sacar las columnas X e id del dataset original:
+datos <- datos %>%
+  select(-X, -id)
+
+# Seleccionar únicamente las columnas de expresión génica para hacer el PCA
+genes <- datos %>%
+  select(starts_with("AQ_"))
+
+# Estandarizar los datos utilizando scale
+genes_escalados <- scale(genes)
+
+# Realizar el PCA
+pca <- prcomp(genes_escalados, center = TRUE, scale. = TRUE)
+
+# Resumen del PCA
+summary(pca)
+
+# Extraer la varianza explicada, construcción de un Scree plot
+fviz_eig(pca, addlabels = TRUE, ylim = c(0, 100))
+```
+
+Después de escalar los gráficos y analizar los valores del PCA (que se pueden apreciar en el summary) una buena forma de empezar a analizar las componentes principales es hacer un *Scree plot* mediante fviz_eig de la librería factoextra. Este gráfico, es útil para poder observar las distintas componentes principales según su porcentaje de varianzas explicado (eje Y) y las distintas dimensiones (eje X). 
+Observando el gráfico, podemos ver como la primera componente explica un 52,5% de la varianza y la segunda un 6,5% de la varianza. Analizándolo, se deberían seleccionar dos componentes principales ya que estas ya explicarían la mayoría de la variabilidad de la expresión génica, un 59% de la varianza total de los datos.
+
+A continuación, se realizará un gráfico de cargas para las distintas variables utilizando su contribución para los distintos colores del gráfico, también utilizando factoextra.
+
+```{r}
+# Gráfico de las variables (cargas) con colores según su contribución
+fviz_pca_var(pca, 
+             col.var = "contrib",  # Colorear las variables según su contribución
+             gradient.cols = c("blue", "yellow", "red"),
+             title = "Contribución de las Variables a los Componentes Principales")
+```
+
+Analizando este gráfico de contribución, podemos realizar distintas observaciones; En el gráfico se han representado las primeras dos dimensiones y todas las variables de expresión génica según su contribución o varianza. Podemos ver, como para la *Dimensión 1* (52.5%) ciertas variables, como las señaladas en azul y púrpura, parecen tener la mayor influencia y son las que contribuyen más a definir el eje principal de variación en los datos. Por otro lado, en la *Dimensión 2* (6.5%), son las variables en amarillo o rojo las que tienen una mayor contribución relativa, aunque este eje explica mucho menos de la varianza total de los datos.
+
+Las variables que están más cerca del origen (cercanas al punto 0,0) tienen poca influencia en las dos primeras dimensiones y podemos observar cómo la dimensión 2 tiene flechas más largas respecto a la dimensión uno. Este hecho puede deberse a que la dimensión 2, capta una menor proporción de la varianza total (6.5%), por lo que las variables que de este eje tienen una mayor influencia relativa (longitud mayor de flecha) respecto a la dimensión 1, que captura el 52.5% de la varianza y tiene contribuciones más distribuidas entre muchas variables, lo que resulta en flechas más cortas.
+
+
+Otra forma de analizar los distintos componentes principales, podría ser a partir de la clusterización por grupos con el k-means:
+
+```{r}
+#También podemos realizar una agrupación por clustering de variables:
+
+# Aplicar k-means con k=3, para detectar 3 grupos distintos:
+set.seed(123)  # Fijar semilla para reproducibilidad
+kmeans_resultado <- kmeans(pca$x[, 1:2], centers = 3)  # Usar los primeros dos componentes
+
+# Gráfico de las observaciones (puntuaciones) con los clústeres
+fviz_pca_ind(pca, 
+             col.ind = factor(kmeans_resultado$cluster),
+             palette = "jco",  # Paleta de colores
+             addEllipses = TRUE,  # Agregar elipses de confianza para los clústeres
+             title = "Observaciones Agrupadas por Clústeres en el PCA")
+
+```
+
+De esta forma, observamos cómo las observaciones (individuos) se agrupan en el espacio definido por los dos primeros componentes principales dónde los puntos representan cada paciente y se puede observar a simple vista su agrupación a través de la técnica de clusterización. 
+
+Coincidiendo con los gráficos anteriores, el eje Dimensión 1 parece ser el principal discriminante entre los clusters, mientras que Dimensión 2 añade algo de información secundaria. Además, podemos observar tres grupos principales (clusters 1, 2, y 3):
+
+* Cluster 1 (azul): Tiene una dispersión más amplia y está principalmente distribuido en el lado negativo de Dim1 y positivo de Dim2.
+
+* Cluster 2 (amarillo): Agrupa observaciones cerca del centro, en la parte media y positiva de Dim1 y Dim2.
+
+* Cluster 3 (gris): Tiene una dispersión más compacta y está mayormente en el lado derecho (positivo) de Dim1.
+
+La posición relativa de los clusters indica que el Cluster 1 está más diferenciado en Dim1, mientras que los Clusters 2 y 3 están más cercanos y pueden compartir características similares.
+
+También se han realizado otros gráficos cómo *gráficos de barras de las cargas* de cada variable pero se excluirán del análisis por no explicar bien las diferencias entre dimensiones.
+
+### Ejercicio 4: Crear una tabla descriptiva con las variables importantes
+
+Para realizar este ejercicio, se creará una tabla descriptiva de los valores sin transformar (media + desviación estándar si son paramétricas, mediana + rango intercuartílico (p25-p75) si no lo son) por terciles de cada componente del PCA (componente 1 y 2). 
+
+Para calcular los terciles de un conjunto de datos, primero se determinará los puntos de corte que dividen el conjunto en tres partes iguales utilizando la función *quantile* y se asignará a cada dato una categoría del tercil, utilizando la función *cut*: 
+
+```{r}
+# Crear terciles para los componentes principales con quantile y cut:
+datos <- datos %>%
+  mutate(
+    PC1_tercile = cut(pca$x[, 1], breaks = quantile(pca$x[, 1], probs = c(0, 0.33, 0.66, 1)),
+                      labels = c("t1", "t2", "t3"), include.lowest = TRUE),
+    PC2_tercile = cut(pca$x[, 2], breaks = quantile(pca$x[, 2], probs = c(0, 0.33, 0.66, 1)),
+                      labels = c("t1", "t2", "t3"), include.lowest = TRUE)
+  )
+
+# Seleccionar solo las variables de genes y los terciles
+genes <- datos %>% select(starts_with("AQ_"), PC1_tercile, PC2_tercile)
+
+```
+
+Una vez categorizados los diferentes datos para cada tercil y seleccionados los datos de expresión génica, se procederá a realizar la tabla descriptiva utilizando *gtsummary*, usando en primer lugar la función tbl_summary con by, statistic, type y digits; y add_p con test y pvalue_fun:
+
+```{r}
+# Generar tabla descriptiva para el Componente 1
+tbl_PC1 <- genes %>%
+  tbl_summary(
+    by = PC1_tercile,  # Agrupar por terciles del Componente 1
+    statistic = all_continuous() ~ "{mean} ({sd})",  # Media y desviación estándar
+    digits = all_continuous() ~ function(x) format(x, digits = 2, scientific = TRUE)
+  ) %>%
+  add_p(
+    test = all_continuous() ~ "kruskal.test",  # Prueba de Kruskal-Wallis
+    pvalue_fun = function(x) sprintf("%.3f", x)  # Formato decimal para valores p
+  )
+
+# Generar tabla descriptiva para el Componente 2
+tbl_PC2 <- genes %>%
+  tbl_summary(
+    by = PC2_tercile,  # Agrupar por terciles del Componente 2
+    statistic = all_continuous() ~ "{mean} ({sd})",  # Media y desviación estándar
+    digits = all_continuous() ~ function(x) format(x, digits = 2, scientific = TRUE)
+  ) %>%
+  add_p(
+    test = all_continuous() ~ "kruskal.test",  # Prueba de Kruskal-Wallis
+    pvalue_fun = function(x) sprintf("%.3f", x)  # Mostrar valores p con 3 decimales
+  )
+
+```
+
+Una vez generados los dos datasets de forma independiente para las dos componentes, se procederá a juntar las tablas con la función *tbl_merge* creando una lista para las dos tablas anteriores y obtener así una tabla parecida a la requerida por el enunciado de la práctica:
+
+```{r}
+# Combinar ambas tablas
+tbl_combinadas <- tbl_merge(
+  tbls = list(tbl_PC1, tbl_PC2),
+  tab_spanner = c("**Component 1**", "**Component 2**")
+)
+
+# Añadir el título a la tabla
+tbl_combinadas <- tbl_combinadas %>%
+  modify_caption("**Tabla descriptiva de genes agrupados por terciles**")
+
+tbl_combinadas
+```
+
+Una vez realizada la tabla descriptiva de las dos primeras componentes para la PCA, esta presenta las características estadísticas de los genes agrupados en terciles (t1, t2, t3) según los Componentes Principales (Componente 1 y Componente 2).
+
+Para cada tercil y cada componente, se incluyen la media y desviación estándar en formato media (SD) de la expresión de los genes y valores p para evaluar las diferencias estadísticas entre los terciles.
+
+Los valores p se calculan usando la prueba de Kruskal-Wallis para comparar distribuciones entre terciles.
+
+Un p-valor < 0.05 indica diferencias estadísticamente significativas en la expresión génica entre los terciles para un componente específico.
+
+Podemos observar diferencias significativas, por ejemplo para el gen AQ_ALOX5, dónde el valor p del Componente 1 es 0.000, lo que sugiere que hay diferencias significativas en la expresión del gen entre los terciles del primer componente.También hay otros genes con p-valores > 0.05, como AQ_NOX5 dónde en el Componente 1 (p-valor = 0.262), indicando que no se observan diferencias significativas en la expresión del gen entre los terciles del primer componente.
+
+Los valores en los terciles (t1, t2, t3) muestran cómo varía la expresión génica. Por ejemplo, AQ_ADIPOQ tiene valores bajos en t1 y t2, pero aumenta en t3 para la primera componente (1). Esto podría indicar que hay genes que contribuyen de manera diferente a los componentes principales.
+
+Identificar genes con diferencias significativas entre terciles puede ayudar a comprender la importancia de ciertos genes en la variabilidad explicada por los dos componentes principales.
+
+### Ejercicio 5: Implementar un modelo de regresión logística
+
+Se utilizará la función vista en clase para construir el modelo de regresión logística, donde la variable resultado es *metástasis (sí/no)* y las variables predictoras son los terciles de los componentes principales obtenidos del PCA y otras variables de ajuste relevantes (sociodemográficas o clínicas).
+
+Se creará una tabla con los datos de la regresión logística utilizando varios modelos de ajuste que sean lógicos y razonables.
+
+Para ello se usarán las funciones específicas vistas en el temario para evaluar la calidad del modelo, además de las funciones específicas para sacar los parámetros (coeficientes exponenciados, IC 95 %, valores p) de cada variable introducida en el modelo.
+
+
+
+
+
+
