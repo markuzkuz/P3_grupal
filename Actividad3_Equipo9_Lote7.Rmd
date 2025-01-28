@@ -18,6 +18,8 @@ library(nortest)
 library(car)
 library(flextable)
 library(factoextra)
+library(pROC)
+
 
 ```
 
@@ -76,8 +78,8 @@ genes_escalados <- scale(genes)
 # Realizar el PCA
 pca <- prcomp(genes_escalados, center = TRUE, scale. = TRUE)
 
-# Resumen del PCA
-summary(pca)
+# Resumen del PCA (se puede ver el resumen descomentando el summary para la PCA)
+#summary(pca)
 
 # Extraer la varianza explicada, construcción de un Scree plot
 fviz_eig(pca, addlabels = TRUE, ylim = c(0, 100))
@@ -221,8 +223,47 @@ Se creará una tabla con los datos de la regresión logística utilizando varios
 
 Para ello se usarán las funciones específicas vistas en el temario para evaluar la calidad del modelo, además de las funciones específicas para sacar los parámetros (coeficientes exponenciados, IC 95 %, valores p) de cada variable introducida en el modelo.
 
+Cómo no existe la variable metástasis, se creará una nueva variable en función de la variable extensión:
+
+```{r}
+# Crear variable dependiente (metástasis: sí/no) en función de la variable extensión:
+datos <- datos %>%
+  mutate(metastasis = ifelse(extension == "metastasico", 1, 0))
+
+# Verificar la nueva columna (se puede descomentar para verla)
+
+#table(datos$metastasis)
+
+# Modelo de regresión logística
+log_model <- glm(metastasis ~ PC1_tercile + edad + trat + tumor, 
+                 data = datos, family = binomial)
+
+# Resumen del modelo (se puede descomentar para ver el resumen del modelo)
+#summary(log_model)
+
+# Crear tabla con gtsummary
+tbl_reg <- tbl_regression(log_model, 
+                          exponentiate = TRUE,
+                          conf.level = 0.95)
+
+tbl_reg
+
+```
+
+Explicar un poco lo que vemos...
+
+```{r}
+
+# Evaluar calidad del modelo
+roc_curve <- roc(datos$metastasis, predict(log_model, type = "response"))
+auc(roc_curve)  # Calcular el área bajo la curva
+
+# Presentar el modelo
+plot(roc_curve)
+
+```
 
 
-
+Curva horrible.... el modelo predice muy mal..
 
 
