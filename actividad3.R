@@ -8,10 +8,10 @@ library(stringr)
 
 
 
-setwd('~/Documents/Màster Bioinformàtica/Assignatures/Estadística y R/taller grupal/mubio02_act3/')
+setwd('~/Documents/Màster Bioinformàtica/Assignatures/Estadística y R/github/P3_grupal_estadistica')
 getwd()
 
-datos <- read.csv("Dataset expresi¢n genes.csv")
+datos <- read.csv("./data/expresion genes.csv")
 
 head(datos)
 str(datos)
