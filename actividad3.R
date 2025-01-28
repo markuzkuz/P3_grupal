@@ -200,10 +200,10 @@ tbl_reg
 
 
 # Evaluar calidad del modelo
-#library(pROC)
-#roc_curve <- roc(data$metastasis, predict(log_model, type = "response"))
-#auc(roc_curve)  # Área bajo la curva
-#plot(roc_curve)
+library(pROC)
+roc_curve <- roc(datos$metastasis, predict(log_model, type = "response"))
+auc(roc_curve)  # Área bajo la curva
+plot(roc_curve)
 
 
 
