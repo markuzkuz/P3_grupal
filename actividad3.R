@@ -207,4 +207,32 @@ plot(roc_curve)
 
 
 
+##### NUEVO MODELO CON MÁS VARIABLES
+
+# Nuevo modelo con más variables relevantes
+modelo_mejorado <- glm(metastasis ~ PC1_tercile + edad + trat + tumor + sexo + hta + dm + neumopatia + cardiopatia + pcr + chol + hdl + ldl + trigliceridos,
+                       data = datos, family = binomial)
+
+# Resumen del modelo
+summary(modelo_mejorado)
+
+# Calcular la curva ROC
+roc_mejorado <- roc(datos$metastasis, predict(modelo_mejorado, type = "response"))
+
+# Mostrar AUC
+auc(roc_mejorado)
+
+# Graficar la nueva curva ROC
+plot(roc_mejorado, col = "blue", lwd = 2, main = "Curva ROC - Modelo Mejorado")
+
+
+# Crear tabla con gtsummary
+tabla_mejorada <- tbl_regression(modelo_mejorado, exponentiate = TRUE, conf.level = 0.95)
+
+# Ver la tabla
+tabla_mejorada
+
+
+
+
 
